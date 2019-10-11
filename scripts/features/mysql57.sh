@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+# Check If MySQL 5.7 Has Been Installed
+if [[ -f /home/vagrant/.homestead-features/mysql57 ]]; then
+    echo "MySQL 5.7 already installed."
+    exit 0
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+touch /home/vagrant/.homestead-features/mysql57
+chown -Rf vagrant:vagrant /home/vagrant/.homestead-features
+
+# Disable Apparmor
+## See https://github.com/laravel/homestead/issues/629#issue-247524528
+service apparmor stop
+service apparmor teardown
+update-rc.d -f apparmor remove
+
+# Remove MySQL
+apt-get remove -y --purge mysql-server mysql-client mysql-common
+apt-get autoremove -y
+apt-get autoclean
+
+rm -rf /var/lib/mysql
+rm -rf /var/log/mysql
+rm -rf /etc/mysql
+
+apt-get update
+
+# Set The Automated Root Password
+debconf-set-selections <<< "mysql-server mysql-server/data-dir select ''"
+debconf-set-selections <<< "mysql-server mysql-server/root_password password secret"
+debconf-set-selections <<< "mysql-server mysql-server/root_password_again password secret"
+
+# Install MySQLL 5.7
+apt-get install -y mysql-server
+
+# Configure MySQLL 5.7 Remote Access and Native Pluggable Authentication
+cat > /etc/mysql/conf.d/mysqld.cnf << EOF
+[mysqld]
+bind-address = 0.0.0.0
+default_authentication_plugin = mysql_native_password
+EOF
+
+service mysql restart
+
+export MYSQL_PWD=secret
+
+mysql --user="root" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'secret';"
+mysql --user="root" -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;"
+mysql --user="root" -e "CREATE USER 'homestead'@'0.0.0.0' IDENTIFIED BY 'secret';"
+mysql --user="root" -e "CREATE USER 'homestead'@'%' IDENTIFIED BY 'secret';"
+mysql --user="root" -e "GRANT ALL PRIVILEGES ON *.* TO 'homestead'@'0.0.0.0' WITH GRANT OPTION;"
+mysql --user="root" -e "GRANT ALL PRIVILEGES ON *.* TO 'homestead'@'%' WITH GRANT OPTION;"
+mysql --user="root" -e "FLUSH PRIVILEGES;"
+service mysql restart
+
+unset MYSQL_PWD
+unset DEBIAN_FRONTEND
