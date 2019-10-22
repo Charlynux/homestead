@@ -37,10 +37,9 @@ debconf-set-selections <<< "mysql-server mysql-server/root_password_again passwo
 apt-get install -y mysql-server
 
 # Configure MySQLL 5.7 Remote Access and Native Pluggable Authentication
-cat > /etc/mysql/conf.d/mysqld.cnf << EOF
+cat > /etc/mysql/mysql.conf.d/mysqld.cnf << EOF
 [mysqld]
 bind-address = 0.0.0.0
-default_authentication_plugin = mysql_native_password
 EOF
 
 service mysql restart
